@@ -1,12 +1,11 @@
 CC = gcc
 CFLAGS = -std=c11 -c
-
 PREFIX = /usr/local
 LIBDIR = $(PREFIX)/lib
 INCLUDEDIR = $(PREFIX)/include
 
-spsc_queue.o: spsc_queue.h
-	$(CC) $(CFLAGS) -x c spsc_queue.h -o spsc_queue.o
+spsc_queue.o: spsc_queue.c spsc_queue.h
+	$(CC) $(CFLAGS) spsc_queue.c -o spsc_queue.o
 
 libspscq.a: spsc_queue.o
 	ar rcs libspscq.a spsc_queue.o
