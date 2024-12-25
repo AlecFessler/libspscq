@@ -47,7 +47,7 @@ The implementation duplicates the buffer pointer and capacity in both the produc
 // Initialize the queue
 struct producer_q producer;
 struct consumer_q consumer;
-void* buffer = malloc(size * sizeof(void*));
+void* buffer = malloc(size * sizeof(void**));
 spsc_queue_init(&producer, &consumer, buffer, size);
 
 // Producer thread
