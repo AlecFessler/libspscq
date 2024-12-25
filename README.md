@@ -35,7 +35,7 @@ The implementation uses precisely chosen memory ordering semantics to ensure cor
 
 ### Cache Line Alignment Behavior
 
-Through extensive benchmarking, I discovered that having the struct end at a cache line boundary is crucial for optimal performance on AMD processors. This can be achieved by placing the cache line alignment directive at the end of the struct, either on the buffer pointer or on the padding (I chose to keep the padding for clarity, though benchmarks show both approaches perform equally well). Empirically, ensuring the struct ends at a cache line boundary provides significantly better performance - moving the alignment directive to the start of the struct or removing it entirely can reduce throughput by up to 50% on AMD processors, suggesting this is related to specific microarchitectural behaviors.
+Through extensive benchmarking, I discovered a significant performance impact related to cache line alignment on AMD processors. Placing the cache line alignment directive (alignas(CACHE_LINE_SIZE)) on the final field of the struct ensures that field begins at a cache line boundary, with the struct's data fields packed tightly in the preceding space. When this field is the padding (or alternatively, the buffer pointer), this arrangement empirically provides optimal performance. Moving the alignment directive elsewhere or removing it entirely can reduce throughput by up to 50% on AMD processors, suggesting this layout interacts favorably with specific microarchitectural behaviors. While the exact mechanism isn't fully understood, the performance benefit is consistently reproducible in benchmarks.
 
 ### Memory Layout Trade-offs
 
