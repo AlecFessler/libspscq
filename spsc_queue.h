@@ -120,4 +120,20 @@ static inline void* spsc_dequeue(struct consumer_q* q) {
   return data;
 }
 
+static inline size_t sizeof_producer_q() {
+  return sizeof(struct producer_q);
+}
+
+static inline size_t alignof_producer_q() {
+  return alignof(struct producer_q);
+}
+
+static inline size_t sizeof_consumer_q() {
+  return sizeof(struct consumer_q);
+}
+
+static inline size_t alignof_consumer_q() {
+  return alignof(struct consumer_q);
+}
+
 #endif // SPSC_QUEUE_H

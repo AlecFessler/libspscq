@@ -24,6 +24,11 @@ int spsc_enqueue(
 );
 void* spsc_dequeue(struct consumer_q* q);
 
+size_t sizeof_producer_q();
+size_t alignof_producer_q();
+size_t sizeof_consumer_q();
+size_t alignof_consumer_q();
+
 }
 
 #endif // SPSC_QUEUE_HPP
