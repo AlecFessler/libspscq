@@ -20,13 +20,7 @@ struct producer_q {
   size_t cached_tail;
   size_t cap;
   void* buf;
-  alignas(CACHE_LINE_SIZE) char padding[
-    CACHE_LINE_SIZE
-    - (sizeof(_Atomic size_t)
-    + sizeof(_Atomic size_t*)
-    + sizeof(size_t) * 2
-    + sizeof(void*))
-  ];
+  alignas(CACHE_LINE_SIZE) char padding[CACHE_LINE_SIZE];
 };
 
 struct consumer_q {
@@ -35,13 +29,7 @@ struct consumer_q {
   size_t cached_head;
   size_t cap;
   void* buf;
-  alignas(CACHE_LINE_SIZE) char padding[
-    CACHE_LINE_SIZE
-    - (sizeof(_Atomic size_t)
-    + sizeof(_Atomic size_t*)
-    + sizeof(size_t) * 2
-    + sizeof(void*))
-  ];
+  alignas(CACHE_LINE_SIZE) char padding[CACHE_LINE_SIZE];
 };
 
 static inline int spsc_queue_init(
