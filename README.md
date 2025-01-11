@@ -23,10 +23,10 @@ The implementation journey starts with a basic unoptimized queue structure:
 
 ```c
 struct spsc_q {
-    uint32_t cap;
+    size_t cap;
     void* buf;
-    _Atomic uint32_t head;
-    _Atomic uint32_t tail;
+    _Atomic size_t head;
+    _Atomic size_t tail;
 };
 ```
 
@@ -58,15 +58,15 @@ An identical performance outcome can be achieved with a single struct approach l
 
 ```c
 struct spsc_q {
-  _Atomic uint32_t head;
-  uint32_t cached_tail;
-  uint32_t producer_cap;
+  _Atomic size_t head;
+  size_t cached_tail;
+  size_t producer_cap;
   void* producer_buf;
   alignas(CACHE_LINE_SIZE) char padding[CACHE_LINE_SIZE];
 
-  _Atomic uint32_t tail;
-  uint32_t cached_head;
-  uint32_t consumer_cap;
+  _Atomic size_t tail;
+  size_t cached_head;
+  size_t consumer_cap;
   void* consumer_buf;
   alignas(CACHE_LINE_SIZE) char padding[CACHE_LINE_SIZE];
 };
