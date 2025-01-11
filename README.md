@@ -40,6 +40,20 @@ My implementation builds on Rigtorp's cached index approach while further optimi
 
 This implementation splits the queue into separate producer and consumer structures, each carefully designed to fit within a single 64-byte cache line. This approach ensures that each thread can access all frequently needed data (index, cached opposite index, capacity, and buffer pointer) without requiring multiple cache line loads.
 
+Proof of the locality working as intended can be seen in the compiled machine code:
+
+```asm
+  mov     QWORD PTR [rax], rdx
+  mov     QWORD PTR [rax+8], rdx
+  mov     QWORD PTR [rax+16], 0
+  mov     QWORD PTR [rax+24], rdx
+  mov     QWORD PTR [rax+32], rdx
+```
+
+Note that some lines were skipped in the above machine code to highlight the offsets (0, +8, +16, etc.), you can view the full assembly output at this compiler explorer link:
+
+https://godbolt.org/z/8z8h731vd
+
 An identical performance outcome can be achieved with a single struct approach like so:
 
 ```c
@@ -72,6 +86,10 @@ The implementation includes both C and C++ versions that compile to compatible m
 - The C++ compiler uses xchg instead of mov instructions
 - C++ std::atomic adds runtime alignment checks
 - Struct layout and memory ordering semantics remain identical
+
+You can view the compiled assembly of both verions at this compiler explorer link:
+
+https://godbolt.org/z/vb9f44ea9
 
 ### Implementation Note
 
