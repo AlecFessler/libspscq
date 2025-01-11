@@ -1,45 +1,61 @@
 # Single-Producer Single-Consumer Lock-Free Queue
 
-A highly optimized single-producer single-consumer (SPSC) lock-free queue implementation in C, focusing on maximizing throughput by minimizing cache coherency traffic and carefully managing CPU cache utilization.
+A highly optimized single-producer single-consumer (SPSC) lock-free queue implementation in C and C++, focusing on maximizing throughput by minimizing cache coherency traffic and carefully managing CPU cache utilization.
 
 ## Performance
 
-On a Ryzen 9 7950x3d with producer and consumer threads pinned to different cores on CCD0:
-- 300 million transfers (600 million total operations) per second
-- 3.35 nanoseconds per queue/dequeue operation
-- 1.6 instructions per cycle
-- 1.49% L1 cache misses
-- 0.77% branch misses
+Performance measurements on a Ryzen 9 7950x3d with producer and consumer threads pinned to different cores on CCD0:
+
+| Implementation | L1 Misses | IPC | Time per Transfer | Transfers/Second |
+|----------------|-----------|-----|-------------------|-----------------|
+| Baseline Unoptimized | 1.98% | 0.76 | 6.19 ns | 163.22M |
+| Cache Aligned Head/Tail | 2.13% | 0.66 | 6.2 ns | 161.49M |
+| Cache Aligned + Local Cached Head/Tail | 1.84% | 1.37 | 3.22 ns | 310.17M |
+| Locality Optimized + Local Cached Head/Tail | 1.44% | 1.6 | 3.04 ns | 328.73M |
+
+These metrics were chosen as they show the most significant changes between implementations. Other performance indicators remained relatively consistent across versions.
 
 ## Design & Optimizations
+
+### Evolution of the Implementation
+
+The implementation journey starts with a basic unoptimized queue structure:
+
+```c
+struct spsc_q {
+    uint32_t cap;
+    void* buf;
+    _Atomic uint32_t head;
+    _Atomic uint32_t tail;
+};
+```
+
+Popular implementations like Folly and Boost improve on this by adding cache line alignment to prevent false sharing between the head and tail. However, this approach creates a trade-off: while it prevents false sharing, it requires each queue operation to touch 3 cache lines (since each field with cache line alignment must start on a new cache line), partially offsetting the performance gained.
+
+Erik Rigtorp's implementation introduced a significant throughput improvement through cached versions of head and tail indices. While this increases potential cache line touches to 3-4 per operation, it dramatically reduces cache coherency traffic by allowing threads to operate using their cached view of the other thread's progress. The variable number of cache line touches occurs because threads only need to check the other thread's actual position when the queue appears full or empty.
+
+My implementation builds on Rigtorp's cached index approach while further optimizing for locality. By carefully arranging the data structures, each thread touches only 1-2 cache lines per operation while maintaining the benefits of both cache alignment and head/tail caching. This resulted in small but consistently measurable improvements across all measured metrics compared to Rigtorp's implementation, primarily due to maximizing locality as much as possible within the algorithm's requirements.
 
 ### Cache-Conscious Thread Separation
 
 This implementation splits the queue into separate producer and consumer structures, each carefully designed to fit within a single 64-byte cache line. This approach ensures that each thread can access all frequently needed data (index, cached opposite index, capacity, and buffer pointer) without requiring multiple cache line loads.
 
-The key insight is that while traditional implementations often focus on preventing false sharing through cache line alignment of individual members, this can actually harm performance by forcing each operation to touch multiple cache lines. By keeping all thread-local data in a single cache line, we minimize cache coherency traffic while still preventing false sharing between threads.
-
 ### Head/Tail Caching Optimization
 
-This implementation uses the head/tail caching optimization, an approach I discovered in Erik Rigtorp's implementation (https://github.com/rigtorp/SPSCQueue). Instead of checking the other thread's progress on every operation, each thread maintains a local cache of the other thread's position. This cache is only updated when the queue appears to be full (for the producer) or empty (for the consumer).
+Building on Erik Rigtorp's approach (https://github.com/rigtorp/SPSCQueue), each thread maintains a local cache of the other thread's position. This cache is only updated when the queue appears to be full (for the producer) or empty (for the consumer).
 
 This optimization dramatically reduces cross-core communication, as threads can often operate independently using their cached view of the other thread's progress. Cache coherency traffic only occurs when threads are actually about to interfere with each other.
 
-### Careful Memory Ordering
+### Cross-Language Compatibility
 
-The implementation uses precisely chosen memory ordering semantics to ensure correctness with minimal synchronization overhead:
-- Relaxed ordering when loading a thread's own index (as each thread is the sole writer of its index)
-- Acquire ordering when loading the other thread's index (to see updates from the other thread)
-- Release ordering for the producer when storing its index (ensuring the consumer sees the correct data)
-- Relaxed ordering for the consumer when storing its index (since the producer doesn't need any particular ordering in the dequeue operation for correctness)
+The implementation includes both C and C++ versions that compile to compatible machine code, allowing usage across the language barrier in shared memory scenarios. While the compiled operations remain functionally identical, there are minor differences:
+- The C++ compiler uses xchg instead of mov instructions
+- C++ std::atomic adds runtime alignment checks
+- Struct layout and memory ordering semantics remain identical
 
-### Cache Line Alignment Behavior
+### Implementation Note
 
-Through extensive benchmarking, I discovered a significant performance impact related to cache line alignment on AMD processors. Placing the cache line alignment directive (alignas(CACHE_LINE_SIZE)) on the final field of the struct ensures that field begins at a cache line boundary, with the struct's data fields packed tightly in the preceding space. When this field is the padding (or alternatively, the buffer pointer), this arrangement empirically provides optimal performance. Moving the alignment directive elsewhere or removing it entirely can reduce throughput by up to 50% on AMD processors, suggesting this layout interacts favorably with specific microarchitectural behaviors. While the exact mechanism isn't fully understood, the performance benefit is consistently reproducible in benchmarks.
-
-### Memory Layout Trade-offs
-
-The implementation duplicates the buffer pointer and capacity in both the producer and consumer structs to ensure each thread has all necessary data in a single cache line. Since each thread needs its own cache line anyway, this approach efficiently uses space that would otherwise be padding while eliminating the need for additional cache line loads during normal operation.
+An interesting aspect of this implementation on x86 platforms is that due to the processor's memory ordering model (which prevents reordering of store-store, load-load, and load-store operations, but allows store-load reordering), and the fact that naturally aligned words already have atomic loads and stores, the compiled assembly essentially results in a standard ring buffer implementation. While it would be technically possible to achieve similar results using std::atomic_signal_fence() to prevent compiler reordering of specific instructions (like reading the tail followed by storing the incremented tail, or writing to the head followed by storing the incremented head), this approach is not recommended. The key insight here is that while x86 naturally provides the necessary memory ordering guarantees at the processor level for this specific case, we still need explicit mechanisms to prevent compiler reordering. Using atomics makes the code's intent explicit and maintains portability across architectures.
 
 ## Usage
 
