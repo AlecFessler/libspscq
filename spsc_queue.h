@@ -95,7 +95,7 @@ static inline void* spsc_dequeue(struct consumer_q* q) {
   if (next_tail == q->cap)
     next_tail = 0;
 
-  atomic_store_explicit(&q->tail, next_tail, memory_order_relaxed);
+  atomic_store_explicit(&q->tail, next_tail, memory_order_release);
 
   return data;
 }

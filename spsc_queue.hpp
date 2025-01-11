@@ -93,7 +93,7 @@ static inline void* spsc_dequeue(struct consumer_q* q) {
   if (next_tail == q->cap)
     next_tail = 0;
 
-  q->tail.store(next_tail, std::memory_order_relaxed);
+  q->tail.store(next_tail, std::memory_order_release);
 
   return data;
 }
