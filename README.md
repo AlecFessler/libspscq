@@ -40,6 +40,26 @@ My implementation builds on Rigtorp's cached index approach while further optimi
 
 This implementation splits the queue into separate producer and consumer structures, each carefully designed to fit within a single 64-byte cache line. This approach ensures that each thread can access all frequently needed data (index, cached opposite index, capacity, and buffer pointer) without requiring multiple cache line loads.
 
+An identical performance outcome can be achieved with a single struct approach like so:
+
+```c
+struct spsc_q {
+  _Atomic uint32_t head;
+  uint32_t cached_tail;
+  uint32_t producer_cap;
+  void* producer_buf;
+  alignas(CACHE_LINE_SIZE) char padding[CACHE_LINE_SIZE];
+
+  _Atomic uint32_t tail;
+  uint32_t cached_head;
+  uint32_t consumer_cap;
+  void* consumer_buf;
+  alignas(CACHE_LINE_SIZE) char padding[CACHE_LINE_SIZE];
+};
+```
+
+The key points are that each thread's 'workspace' falls within its own single cache line, separate from the other threads. The duplicated capacity and buffer go into what would otherwise be padding, so have no real cost.
+
 ### Head/Tail Caching Optimization
 
 Building on Erik Rigtorp's approach (https://github.com/rigtorp/SPSCQueue), each thread maintains a local cache of the other thread's position. This cache is only updated when the queue appears to be full (for the producer) or empty (for the consumer).
@@ -55,7 +75,11 @@ The implementation includes both C and C++ versions that compile to compatible m
 
 ### Implementation Note
 
-An interesting aspect of this implementation on x86 platforms is that due to the processor's memory ordering model (which prevents reordering of store-store, load-load, and load-store operations, but allows store-load reordering), and the fact that naturally aligned words already have atomic loads and stores, the compiled assembly essentially results in a standard ring buffer implementation. While it would be technically possible to achieve similar results using std::atomic_signal_fence() to prevent compiler reordering of specific instructions (like reading the tail followed by storing the incremented tail, or writing to the head followed by storing the incremented head), this approach is not recommended. The key insight here is that while x86 naturally provides the necessary memory ordering guarantees at the processor level for this specific case, we still need explicit mechanisms to prevent compiler reordering. Using atomics makes the code's intent explicit and maintains portability across architectures.
+An interesting aspect of this implementation on x86 platforms is that due to the processor's memory ordering model (which prevents reordering of store-store, load-load, and load-store operations, but allows store-load reordering), and the fact that naturally aligned words already have atomic loads and stores, the compiled assembly essentially results in a standard ring buffer implementation. While it would be technically possible to achieve similar results using std::atomic_signal_fence() to prevent compiler reordering of specific instructions (like reading the tail followed by storing the incremented tail, or writing to the head followed by storing the incremented head), this approach is not recommended. The key insight here is that while x86 naturally provides the necessary memory ordering guarantees at the processor level for this specific case, we still need explicit mechanisms to prevent compiler reordering. Using atomics makes the code's intent explicit and maintains portability across architectures. This compiler explorer link shows the compiled assembly for the regular version with atomics, and the version doing what I mentioned above:
+
+https://godbolt.org/z/bcd9jcssf
+
+The compiled assembly is not quite identical, but what's important to note is that layout of the structs are still identical, and that the atomics and memory orderings have not output any particular instructions, as in x86, only acquire-release and sequential consistency orderings will result in an MFENCE, and as mentioned above, loads and stores here are naturally atomic. Again, I don't recommend doing this, it's not an optimization, and it's not portable, it's just an interesting aside that gives insight into why this algorithm is such an efficient lock-free structure; The required synchronization is so lightweight, it effectively compiles into a standard ring buffer.
 
 ## Usage
 
