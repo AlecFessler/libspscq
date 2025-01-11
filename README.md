@@ -1,6 +1,6 @@
 # Single-Producer Single-Consumer Lock-Free Queue
 
-A highly optimized single-producer single-consumer (SPSC) lock-free queue implementation in C and C++, focusing on maximizing throughput by minimizing cache coherency traffic and carefully managing CPU cache utilization.
+A highly optimized single-producer single-consumer (SPSC) lock-free queue implementation in C and C++, focusing on maximizing throughput by minimizing cache coherency traffic and maximizing cache locality.
 
 ## Performance
 
