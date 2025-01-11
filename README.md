@@ -43,11 +43,11 @@ This implementation splits the queue into separate producer and consumer structu
 Proof of the locality working as intended can be seen in this compiled machine code from the init function setting up the producer struct:
 
 ```asm
-  mov     QWORD PTR [rax], rdx
-  mov     QWORD PTR [rax+8], rdx
-  mov     QWORD PTR [rax+16], 0
-  mov     QWORD PTR [rax+24], rdx
-  mov     QWORD PTR [rax+32], rdx
+  mov     QWORD PTR [rax], rdx     // head
+  mov     QWORD PTR [rax+8], rdx   // tail_ptr
+  mov     QWORD PTR [rax+16], 0    // cached_tail
+  mov     QWORD PTR [rax+24], rdx  // capacity
+  mov     QWORD PTR [rax+32], rdx  // buffer
 ```
 
 Note that some lines were skipped in the above machine code to highlight the offsets (0, +8, +16, etc.), you can view the full assembly output at this compiler explorer link:
