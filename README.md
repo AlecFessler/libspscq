@@ -40,6 +40,26 @@ My implementation builds on Rigtorp's cached index approach while further optimi
 
 This implementation splits the queue into separate producer and consumer structures, each carefully designed to fit within a single 64-byte cache line. This approach ensures that each thread can access all frequently needed data (index, cached opposite index, capacity, and buffer pointer) without requiring multiple cache line loads.
 
+```c++
+struct producer_q {
+  std::atomic<size_t> head;
+  std::atomic<size_t>* tail_ptr;
+  size_t cached_tail;
+  size_t cap;
+  void* buf;
+  alignas(CACHE_LINE_SIZE) char padding[CACHE_LINE_SIZE];
+};
+
+struct consumer_q {
+  std::atomic<size_t> tail;
+  std::atomic<size_t>* head_ptr;
+  size_t cached_head;
+  size_t cap;
+  void* buf;
+  alignas(CACHE_LINE_SIZE) char padding[CACHE_LINE_SIZE];
+};
+```
+
 Proof of the locality working as intended can be seen in this compiled machine code from the init function setting up the producer struct:
 
 ```asm
