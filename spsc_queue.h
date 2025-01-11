@@ -73,9 +73,6 @@ static inline int spsc_enqueue(
   void** slot = (void**)q->buf + head;
   *slot = data;
 
-  // update the head with release semantics so the consumer
-  // sees the assignment of the ptr to the slot before the
-  // atomic store of the head index
   atomic_store_explicit(&q->head, next, memory_order_release);
 
   return 0;
@@ -98,11 +95,6 @@ static inline void* spsc_dequeue(struct consumer_q* q) {
   if (next_tail == q->cap)
     next_tail = 0;
 
-  // unlike in the enqueue, where we need the ptr assignment to
-  // 'happen before' the atomic increment, there's no operation in
-  // this function that needs 'happens before' ordering wrt the atomic store
-  // so relaxed ordering is sufficient, the consumer thread will see the
-  // correct data ptr since it was written to it's own cache
   atomic_store_explicit(&q->tail, next_tail, memory_order_relaxed);
 
   return data;
